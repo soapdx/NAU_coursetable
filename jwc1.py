@@ -1,5 +1,5 @@
 #coding=utf-8
-import requests,datetime,codecs,re
+import requests,datetime,codecs,re,pytesseract,sys
 from PIL import Image
 from io import BytesIO
 from ics import Calendar,Event
@@ -55,24 +55,27 @@ def AppendKC(kc):
   return
 if __name__ == '__main__':
   c = Calendar()
-  usrname = input("Please input your name:\n")
-  pwd = input("Please input your passwd:\n")
+  usrname = sys.argv[1]
+  pwd = sys.argv[2]
+  #usrname = input("Please input your name:\n")
+  #pwd = input("Please input your passwd:\n")
   s=requests.session()
   r=s.get('http://jwc.nau.edu.cn/LoginOut.aspx',timeout=60)
   #print(r.text)
-  f = open('VCode.jpg', 'wb')
+  f = open('VCode.png', 'wb')
   f.write(s.get('http://jwc.nau.edu.cn/CheckCode.aspx').content)
   f.close()
-  img = Image.open('VCode.jpg')
-  img.show()
-  ckcode = input("Please input code:\n")
-  data={'UserName':usrname,'UserPwd':pwd,'CheckCode':ckcode,'btnLogin':'登录'}
-  r=s.post('http://jwc.nau.edu.cn/Login.aspx',data,timeout=60)
+  img = Image.open('VCode.png').convert('L')
+  #img.show()
+  ckcode = pytesseract.image_to_string(img)
+  #ckcode = input("Please input code:\n")
+  data = {'UserName':usrname,'UserPwd':pwd,'CheckCode':ckcode,'btnLogin':'登录'}
+  r = s.post('http://jwc.nau.edu.cn/Login.aspx',data,timeout=60)
   print(r.status_code)
-  r=s.get('http://jwc.nau.edu.cn/Students/MyCourseScheduleTable.aspx')
+  r = s.get('http://jwc.nau.edu.cn/Students/MyCourseScheduleTable.aspx')
   #print(r.text)
-  idx=r.text.find('for(i = 0;i <')
-  num=int(r.text[idx+14:idx+16])
+  idx = r.text.find('for(i = 0;i <')
+  num = int(r.text[idx+14:idx+16])
   for i in range(num-1):
     index0=r.text.find('subcat['+str(i)+']')
     index1=r.text.find('subcat['+str(i+1)+']')
@@ -82,10 +85,10 @@ if __name__ == '__main__':
     else:
       kc0 = r.text[index0 + 22:index1 - 34]
       AppendKC(kc0.replace("'","").replace(' ','').replace(',', '/', kc0.count(',', kc0.find('第'), kc0.find('周')) + 1).replace('/', ',', 1).split(','))
-  kc0 =r.text[index1+23:idx-30]
+  kc0 = r.text[index1+23:idx-30]
   AppendKC(kc0.replace("'","").replace(' ','').replace(',', '/', kc0.count(',', kc0.find('第'), kc0.find('周')) + 1).replace('/', ',', 1).split(','))
 
   print(c.events)
 
-  codecs.open('my.ics', 'wb', 'utf-8').writelines(c)
+  codecs.open(usrname+'.ics', 'wb', 'utf-8').writelines(c)
   log_out=s.get('http://jwc.nau.edu.cn/LoginOut.aspx')
